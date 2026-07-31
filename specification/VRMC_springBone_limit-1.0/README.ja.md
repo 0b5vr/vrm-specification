@@ -118,6 +118,18 @@ glTF 2.0仕様に向けて策定されています。
 
 ![球面リミットのPitch・Yawの図](./figures/spherical-limit-pitch-yaw.png)
 
+#### Singular Directions
+
+Tailの方向から制限後の方向が一意に定まらない場合、実装はリミットのローカル座標系において、次の表に示す方向を選択しなければいけません (MUST) 。
+
+|リミット|Tailの方向|制限後の方向|
+|:-|:-|:-|
+|コーン|y軸負方向|z軸正方向側の境界|
+|ヒンジ|x軸正方向または負方向|y軸正方向|
+|ヒンジ|y軸負方向|z軸正方向側の境界|
+|球面|x軸正方向または負方向|Y軸正方向側の境界|
+|球面|y軸負方向|z軸正方向側の境界|
+
 ### Rotation
 
 各リミットは、 `rotation` プロパティを変更することでリミットの向きを変更できます。
@@ -409,6 +421,9 @@ HeadからTailに向かう方向がちょうどy軸負方向の場合、最短�
 var tailDir = (nextTail - joint.worldPosition).normalized;
 ```
 
+> 以下の擬似コードでは、説明を簡潔にするため浮動小数点誤差を考慮していません。
+> 実装では、使用する数値型の精度に応じて、特異方向の判定に許容誤差を用いたり、中間値を演算 (acos, asinなど) の定義域に収めたりするなど、必要な数値誤差対策を行うことを推奨します。
+
 ### Rotation
 
 以下に、各リミットをHeadからTailに向かう方向ならびに `rotation` プロパティを利用して回転させる参考実装を擬似コードで示します。
@@ -421,8 +436,8 @@ let axisRotation;
 // headからtailに向かうベクトルとY+方向との内積
 let dot = boneAxis.y;
 
-if (dot + 1 < 1e-8) {
-  // headからtailに向かうベクトルがY-方向に近い場合、X軸周りに180度回転させた回転を設定する
+if (dot == -1.0) {
+  // headからtailに向かうベクトルがY-方向の場合、X軸周りに180度回転させた回転を設定する
   axisRotation = Quaternion(1, 0, 0, 0);
 } else {
   // それ以外の場合、Y+方向からjointのheadからtailに向かうベクトルへの最小回転を設定する
@@ -448,19 +463,27 @@ tailDir = tailDir.applyQuaternion(rotation);
 以下は、擬似コードによるコーンリミットの参考実装です。
 
 ```ts
-// angleの上限値はπ
+// angleを0以上π以下に制限する
 let limitAngle = clamp(limit.angle, 0.0, PI);
 
 // tailDirのy要素をlimitに設定されたangleの余弦と比較する
-let cosAngle = cos(limitAngle);
-if (tailDir.y < cosAngle) {
+let cosLimitAngle = cos(limitAngle);
+if (tailDir.y < cosLimitAngle) {
   // x・z要素を、tailDirの正弦とlimitに設定されたangleの正弦の比を用いてスケールする
-  let ratio = sqrt((1.0 - cosAngle * cosAngle) / (1.0 - tailDir.y * tailDir.y));
-  tailDir.x *= ratio;
-  tailDir.z *= ratio;
+  let horizontalLengthSquared = 1.0 - tailDir.y * tailDir.y;
 
-  // y要素を、limitに設定されたangleの余弦とする
-  tailDir.y = cosAngle;
+  if (horizontalLengthSquared == 0.0) {
+    // tailDirがy軸負方向の場合、z軸正方向側を選択する
+    tailDir.x = 0.0;
+    tailDir.z = sqrt(1.0 - cosLimitAngle * cosLimitAngle);
+  } else {
+    let scale = sqrt((1.0 - cosLimitAngle * cosLimitAngle) / horizontalLengthSquared);
+    tailDir.x *= scale;
+    tailDir.z *= scale;
+  }
+
+  // y要素をlimitに設定されたangleの余弦とする
+  tailDir.y = cosLimitAngle;
 }
 ```
 
@@ -469,22 +492,27 @@ if (tailDir.y < cosAngle) {
 以下は、擬似コードによるヒンジリミットの参考実装です。
 
 ```ts
-// angleの上限値はπ
+// angleを0以上π以下に制限する
 let limitAngle = clamp(limit.angle, 0.0, PI);
 
-// x要素を0にし、正規化する
-tailDir.x = 0.0;
-tailDir = tailDir.normalized;
+let projectedLengthSquared = tailDir.y * tailDir.y + tailDir.z * tailDir.z;
+if (projectedLengthSquared == 0.0) {
+  // tailDirがx軸正方向または負方向の場合、Y軸正方向を選択する
+  tailDir = vec3(0.0, 1.0, 0.0);
+} else {
+  // tailDirをヒンジのYZ平面へ射影する
+  tailDir = vec3(0.0, tailDir.y, tailDir.z) / sqrt(projectedLengthSquared);
 
-// tailDirのy要素をlimitに設定されたangleの余弦と比較する
-let cosAngle = cos(limitAngle);
-if (tailDir.y < cosAngle) {
-  // z要素を、tailDirの正弦とlimitに設定されたangleの正弦の比を用いてスケールする
-  let ratio = sqrt((1.0 - cosAngle * cosAngle) / (1.0 - tailDir.y * tailDir.y));
-  tailDir.z *= ratio;
+  // tailDirのy要素をlimitに設定されたangleの余弦と比較する
+  let cosLimitAngle = cos(limitAngle);
+  if (tailDir.y < cosLimitAngle) {
+    let sinLimitAngle = sqrt(1.0 - cosLimitAngle * cosLimitAngle);
 
-  // y要素を、limitに設定されたangleの余弦とする
-  tailDir.y = cosAngle;
+    // tailDirがy軸負方向の場合、z軸正方向側を選択する
+    let zSign = (tailDir.z < 0.0) ? -1.0 : 1.0;
+    tailDir.y = cosLimitAngle;
+    tailDir.z = sinLimitAngle * zSign;
+  }
 }
 ```
 
@@ -493,12 +521,21 @@ if (tailDir.y < cosAngle) {
 以下は、擬似コードによる球面リミットの参考実装です。
 
 ```ts
-// pitchの上限値はπ、yawの上限値はπ/2
+// pitchを0以上π以下、yawを0以上π/2以下に制限する
 let limitPitch = clamp(limit.pitch, 0.0, PI);
 let limitYaw = clamp(limit.yaw, 0.0, PI / 2.0);
 
 // tailDirのpitch・yawを計算する
-var pitch = atan2(tailDir.z, tailDir.y);
+var pitch;
+if (tailDir.y == -1.0) {
+  // tailDirがy軸負方向の場合、Z軸正方向側の境界を選択するため、pitchをπとする
+  pitch = PI;
+} else if (abs(tailDir.x) == 1.0) {
+  // tailDirがx軸正方向または負方向の場合、pitchを0とする
+  pitch = 0.0;
+} else {
+  pitch = atan2(tailDir.z, tailDir.y);
+}
 var yaw = asin(tailDir.x);
 
 // pitch・yawをlimitに設定されたpitch・yawを用いて制限する
