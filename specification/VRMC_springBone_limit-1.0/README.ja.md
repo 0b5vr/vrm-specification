@@ -448,8 +448,11 @@ tailDir = tailDir.applyQuaternion(rotation);
 以下は、擬似コードによるコーンリミットの参考実装です。
 
 ```ts
+// angleの上限値はπ
+let limitAngle = clamp(limit.angle, 0.0, PI);
+
 // tailDirのy要素をlimitに設定されたangleの余弦と比較する
-let cosAngle = cos(limit.angle);
+let cosAngle = cos(limitAngle);
 if (tailDir.y < cosAngle) {
   // x・z要素を、tailDirの正弦とlimitに設定されたangleの正弦の比を用いてスケールする
   let ratio = sqrt((1.0 - cosAngle * cosAngle) / (1.0 - tailDir.y * tailDir.y));
@@ -466,12 +469,15 @@ if (tailDir.y < cosAngle) {
 以下は、擬似コードによるヒンジリミットの参考実装です。
 
 ```ts
+// angleの上限値はπ
+let limitAngle = clamp(limit.angle, 0.0, PI);
+
 // x要素を0にし、正規化する
 tailDir.x = 0.0;
 tailDir = tailDir.normalized;
 
 // tailDirのy要素をlimitに設定されたangleの余弦と比較する
-let cosAngle = cos(limit.angle);
+let cosAngle = cos(limitAngle);
 if (tailDir.y < cosAngle) {
   // z要素を、tailDirの正弦とlimitに設定されたangleの正弦の比を用いてスケールする
   let ratio = sqrt((1.0 - cosAngle * cosAngle) / (1.0 - tailDir.y * tailDir.y));
@@ -487,20 +493,24 @@ if (tailDir.y < cosAngle) {
 以下は、擬似コードによる球面リミットの参考実装です。
 
 ```ts
+// pitchの上限値はπ、yawの上限値はπ/2
+let limitPitch = clamp(limit.pitch, 0.0, PI);
+let limitYaw = clamp(limit.yaw, 0.0, PI / 2.0);
+
 // tailDirのpitch・yawを計算する
 var pitch = atan2(tailDir.z, tailDir.y);
 var yaw = asin(tailDir.x);
 
 // pitch・yawをlimitに設定されたpitch・yawを用いて制限する
-if (abs(pitch) > limit.pitch) {
+if (abs(pitch) > limitPitch) {
   isLimited = true;
-  pitch = limit.pitch * sign(pitch);
+  pitch = limitPitch * sign(pitch);
 }
 
 // yawをlimitに設定されたyawを用いて制限する
-if (abs(yaw) > limit.yaw) {
+if (abs(yaw) > limitYaw) {
   isLimited = true;
-  yaw = limit.yaw * sign(yaw);
+  yaw = limitYaw * sign(yaw);
 }
 
 // tailDirをpitch・yawを用いて再計算する
