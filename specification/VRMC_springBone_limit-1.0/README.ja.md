@@ -546,7 +546,7 @@ if (tailDir.y == -1.0) {
 }
 var yaw = asin(tailDir.x);
 
-// pitch・yawをlimitに設定されたpitch・yawを用いて制限する
+// pitchをlimitに設定されたpitchを用いて制限する
 if (abs(pitch) > limitPitch) {
   isLimited = true;
   pitch = limitPitch * sign(pitch);
