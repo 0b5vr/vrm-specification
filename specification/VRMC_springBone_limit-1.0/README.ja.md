@@ -158,6 +158,9 @@ HeadからTailに向かう方向がちょうどy軸負方向の場合、最短�
 
 リミットは、 `VRMC_springBone` で定義されたジョイントに `VRMC_springBone_limit` 拡張を追加することで記述されます。
 
+`VRMC_springBone.springs[*].joints` 配列の末尾のジョイントは、 `VRMC_springBone` においてTailとしてのみ使用されるため、実装は末尾のジョイントに記述された本拡張を無視しなければなりません（MUST）。
+Exporter は、末尾のジョイントに本拡張を出力してはいけません（MUST NOT）。
+
 ```json
 {
   "extensionsUsed": [
