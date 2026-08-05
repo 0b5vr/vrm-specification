@@ -243,7 +243,7 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 
 #### VRMC_springBone_limit.specVersion ✅
 
-`VRMC_springBone_limit` 拡張のバージョンを示します。値は `"1.0-draft"` でなければなりません。
+`VRMC_springBone_limit` 拡張のバージョンを示します。値は `"1.0-draft"` でなければなりません（MUST）。
 
 - 型: `string`
 - 必須: Yes
@@ -259,7 +259,7 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 
 スプリングに適用するリミットを定義します。
 
-`cone` ・ `hinge` ・ `spherical` のうち、いずれか一つのみを含む必要があります。
+`cone` ・ `hinge` ・ `spherical` のうち、いずれか一つのみを含む必要があります（MUST）。
 
 #### Properties
 
