@@ -13,6 +13,7 @@
     - [Cone Limit](#cone-limit)
     - [Hinge Limit](#hinge-limit)
     - [Spherical Limit](#spherical-limit)
+    - [Singular Directions](#singular-directions)
   - [Rotation](#rotation)
   - [Limit Application Order](#limit-application-order)
 - [glTF Schema Updates](#gltf-schema-updates)
