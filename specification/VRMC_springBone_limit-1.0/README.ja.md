@@ -87,7 +87,7 @@ glTF 2.0仕様に向けて策定されています。
 
 コーンリミットが定義されたスプリングは、HeadからTailに向かう方向を基準として、コーンの角度として指定した角度よりも傾くことがないように回転が制限されます。
 
-リミットの回転を指定しない場合、コーンはHeadからTailに向かう方向に向かって広がるように定義されます。
+リミットのローカル座標系では、コーンはy軸正方向に開きます。
 
 ![コーンリミットの図](./figures/cone-limit.png)
 
@@ -99,7 +99,7 @@ glTF 2.0仕様に向けて策定されています。
 
 ヒンジリミットが定義されたスプリングは、HeadからTailに向かう方向を基準として、ヒンジの角度として指定した角度よりも傾くことがないよう、またヒンジが定義した回転軸以外で回転することがないように回転が制限されます。
 
-リミットの回転を指定しない場合、オブジェクトのy軸正方向に広がり、x軸周りの回転を許容するような形状を持つヒンジを、HeadからTailに向かう方向にヒンジが広がるよう最短経路で回転させた状態で定義します。
+リミットのローカル座標系では、ヒンジはy軸正方向に開き、x軸周りの回転を許容します。
 
 ![ヒンジリミットの図](./figures/hinge-limit.png)
 
@@ -111,7 +111,7 @@ glTF 2.0仕様に向けて策定されています。
 
 球面リミットが定義されたスプリングは、HeadからTailに向かう方向を基準として、パラメータとして設定したPitch・Yawよりも傾くことがないように回転が制限されます。
 
-リミットの回転を指定しない場合、オブジェクトのy軸正方向を基準として、x軸周りの回転をPitch・z軸周りの回転をYawとするような球面状のリミットを、HeadからTailに向かう方向が基準となるよう最短経路で回転させた状態で定義します。
+リミットのローカル座標系では、y軸正方向を基準として、x軸周りの回転をPitch、z軸周りの回転をYawとします。
 
 ![球面リミットの図](./figures/spherical-limit.png)
 
@@ -133,14 +133,17 @@ Tailの方向から制限後の方向が一意に定まらない場合、実装�
 
 ### Rotation
 
-各リミットは、 `rotation` プロパティを変更することでリミットの向きを変更できます。
-各リミットは、オブジェクトのy軸正方向を基準として、各リミットの形状をHeadからTailに向かう方向が基準となるよう最短経路で回転させた状態が初期回転となりますが、その状態のローカル座標系から `rotation` だけ回転させた状態が適用されます。
+各リミットの向きは、次の手順で決定します。
 
-![回転順序を示した動画](./figures/rotation.gif)
+まず、オブジェクトのy軸正方向をHeadからTailに向かう方向へ一致させるような最短経路の回転を、各リミット固有のローカル形状に適用します。この状態をデフォルトの向きとします。
 
-HeadからTailに向かう方向がちょうどy軸負方向の場合、最短経路の回転が一意に定まらないため、その場合はX軸周りに180度回転させた状態が初期回転となるよう実装しなければいけません (**MUST**) 。
+HeadからTailに向かう方向がちょうどy軸負方向の場合、最短経路の回転が一意に定まらないため、その場合はX軸周りに180度回転させた状態をデフォルトの向きとするよう実装しなければいけません (**MUST**) 。
 
 > HeadからTailに向かう方向がちょうどy軸負方向もしくはそれに近い場合、実装間での結果が安定しない可能性があります。アーティストは、SpringBone JointにLimitを適用する場合、できるだけy軸負方向に近い方向を避けることを推奨します。
+
+デフォルトの向きを適用後、リミットに `rotation` が指定されている場合、デフォルトの向きによって定まるローカル座標系で指定された回転を適用します。
+
+![回転順序を示した動画](./figures/rotation.gif)
 
 回転について、詳細な実装を[Appendix: Reference Implementations](#appendix-reference-implementations)に示します。
 
@@ -209,27 +212,6 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 ### VRMC_springBone_limit
 
 本拡張のルートオブジェクトです。
-
-{
-  "$schema": "http://json-schema.org/draft-04/schema",
-  "title": "VRMC_springBone_limit",
-  "type": "object",
-  "description": "An angle limit for VRMC_springBone.",
-  "allOf": [ { "$ref": "glTFProperty.schema.json" } ],
-  "properties": {
-    "specVersion": {
-      "type": "string",
-      "description": "Specification version of VRMC_springBone_limit."
-    },
-    "limit": {
-      "$ref": "VRMC_springBone_limit.limit.schema.json"
-    },
-    "extensions": { },
-    "extras": { }
-  },
-  "required": [ "specVersion", "limit" ]
-}
-
 
 #### Properties
 
@@ -308,7 +290,7 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 
 #### JSON Schema
 
-[VRMC_springBone_limit.cone.schema.json](schema/VRMC_springBone_limit.cone.schema.json)
+[VRMC_springBone_limit.coneLimit.schema.json](schema/VRMC_springBone_limit.coneLimit.schema.json)
 
 #### ConeLimit.angle ✅
 
@@ -342,7 +324,7 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 
 #### JSON Schema
 
-[VRMC_springBone_limit.hinge.schema.json](schema/VRMC_springBone_limit.hinge.schema.json)
+[VRMC_springBone_limit.hingeLimit.schema.json](schema/VRMC_springBone_limit.hingeLimit.schema.json)
 
 #### HingeLimit.angle ✅
 
@@ -377,7 +359,7 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 
 #### JSON Schema
 
-[VRMC_springBone_limit.spherical.schema.json](schema/VRMC_springBone_limit.spherical.schema.json)
+[VRMC_springBone_limit.sphericalLimit.schema.json](schema/VRMC_springBone_limit.sphericalLimit.schema.json)
 
 #### SphericalLimit.pitch ✅
 
@@ -419,12 +401,13 @@ Exporter は、末尾のジョイントに本拡張を出力してはいけま�
 - 慣性計算の直後
 - 各コライダーとの衝突が発生した場合、その直後
 
-これを踏まえて、リミットによる角度制限を適用すべき対象となる値は、SpringBoneの慣性計算およびコライダーとの衝突判定の過程で利用する、そのJointが対象とする子Nodeのワールド空間における位置 `nextTail` となります。
-慣性計算ならびに各コライダーとの衝突判定の直後に、 `nextTail` の方向を指定された角度範囲に収めるように制限を適用します。
-これは、 `nextTail` のJoint位置からの相対的な長さの制限を行うタイミングと同一です。
+リミットによる角度制限は、`nextTail` に適用します。
+`nextTail` は、SpringBoneの更新中における、そのJointが対象とする子Nodeの暫定的なワールド空間上の位置を表します。
+慣性計算の直後、および各コライダーとの衝突を解決した直後に、Jointの位置から `nextTail` に向かう方向が指定された角度範囲に収まるよう、リミットを適用します。
+同じタイミングで、スプリングの長さを維持するため、Jointの位置から `nextTail` までの距離を制限します。
 
-以下の参考実装内において登場する `tailDir` は、制限するjointのワールド空間における方向を正規化された三次元ベクトルで表したものです。
-`nextTail` を利用して、以下の擬似コードのように定義します。
+以下の参考実装内において登場する `tailDir` は、制限対象のJointから `nextTail` に向かう、ワールド空間上の正規化されたベクトルです。
+以下の擬似コードのように定義します。
 
 ```ts
 var tailDir = (nextTail - joint.worldPosition).normalized;
@@ -478,7 +461,7 @@ let limitAngle = clamp(limit.angle, 0.0, PI);
 // tailDirのy要素をlimitに設定されたangleの余弦と比較する
 let cosLimitAngle = cos(limitAngle);
 if (tailDir.y < cosLimitAngle) {
-  // x・z要素を、tailDirの正弦とlimitに設定されたangleの正弦の比を用いてスケールする
+  // x・z成分からなるベクトルの長さが、limitに設定されたangleの正弦と等しくなるようにスケールする
   let horizontalLengthSquared = 1.0 - tailDir.y * tailDir.y;
 
   if (horizontalLengthSquared == 0.0) {

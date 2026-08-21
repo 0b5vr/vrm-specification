@@ -87,7 +87,7 @@ A cone limit is defined by an angle representing the spread of the cone and a ro
 
 The rotation of a spring with a cone limit is constrained so that it does not tilt from the Head-to-Tail direction by more than the angle specified for the cone.
 
-If no limit rotation is specified, the cone is defined to spread in the Head-to-Tail direction.
+In the limit's local coordinate system, the cone opens toward the positive y-axis direction.
 
 ![Diagram of a cone limit](./figures/cone-limit.png)
 
@@ -99,7 +99,7 @@ A hinge limit is defined by an angle representing the spread of the hinge and a 
 
 The rotation of a spring with a hinge limit is constrained so that it does not tilt from the Head-to-Tail direction by more than the angle specified for the hinge and does not rotate about any axis other than the rotation axis defined by the hinge.
 
-If no limit rotation is specified, the hinge is defined by first creating a shape that spreads in the positive y-axis direction and permits rotation about the x-axis, and then rotating it along the shortest path so that the hinge spreads in the Head-to-Tail direction.
+In the limit's local coordinate system, the hinge opens toward the positive y-axis direction and permits rotation about the x-axis.
 
 ![Diagram of a hinge limit](./figures/hinge-limit.png)
 
@@ -111,7 +111,7 @@ A spherical limit is defined by two angles, Pitch and Yaw, and a rotation repres
 
 The rotation of a spring with a spherical limit is constrained so that it does not tilt from the Head-to-Tail direction by more than the Pitch and Yaw values specified by the parameters.
 
-If no limit rotation is specified, the spherical limit is defined by first creating a spherical limit relative to the positive y-axis direction, where rotation about the x-axis is Pitch and rotation about the z-axis is Yaw, and then rotating it along the shortest path so that the Head-to-Tail direction becomes the reference direction.
+In the limit's local coordinate system, the positive y-axis direction is the reference direction, with Pitch representing rotation about the x-axis and Yaw representing rotation about the z-axis.
 
 ![Diagram of a spherical limit](./figures/spherical-limit.png)
 
@@ -133,14 +133,17 @@ If the constrained direction cannot be uniquely determined from the Tail directi
 
 ### Rotation
 
-The orientation of each limit can be changed by modifying its `rotation` property.
-The initial rotation of each limit is obtained by rotating its shape, which is initially oriented relative to the positive y-axis direction, along the shortest path so that the Head-to-Tail direction becomes the reference direction. The applied orientation is the result of applying `rotation` in the local coordinate system of that initial rotation.
+The orientation of each limit is determined as follows.
 
-![Animation showing the rotation order](./figures/rotation.gif)
+First, rotate each limit's local shape along the shortest path that aligns the object's positive y-axis direction with the Head-to-Tail direction. The result is the default orientation.
 
-If the Head-to-Tail direction is exactly the negative y-axis direction, the shortest-path rotation cannot be uniquely determined. In this case, implementations **MUST** use a 180-degree rotation about the x-axis as the initial rotation.
+If the Head-to-Tail direction is exactly the negative y-axis direction, the shortest-path rotation cannot be uniquely determined. In this case, implementations **MUST** use a 180-degree rotation about the x-axis as the default orientation.
 
 > Results may be unstable across implementations if the Head-to-Tail direction is exactly or nearly the negative y-axis direction. Artists are advised to avoid directions close to the negative y-axis direction whenever possible when applying a Limit to a SpringBone Joint.
+
+After applying the default orientation, if `rotation` is specified for the limit, apply that rotation in the local coordinate system defined by the default orientation.
+
+![Animation showing the rotation order](./figures/rotation.gif)
 
 A detailed reference implementation of rotation is provided in [Appendix: Reference Implementations](#appendix-reference-implementations).
 
@@ -209,27 +212,6 @@ Exporters **MUST NOT** write this extension to the last joint.
 ### VRMC_springBone_limit
 
 The root object of this extension.
-
-{
-  "$schema": "http://json-schema.org/draft-04/schema",
-  "title": "VRMC_springBone_limit",
-  "type": "object",
-  "description": "An angle limit for VRMC_springBone.",
-  "allOf": [ { "$ref": "glTFProperty.schema.json" } ],
-  "properties": {
-    "specVersion": {
-      "type": "string",
-      "description": "Specification version of VRMC_springBone_limit."
-    },
-    "limit": {
-      "$ref": "VRMC_springBone_limit.limit.schema.json"
-    },
-    "extensions": { },
-    "extras": { }
-  },
-  "required": [ "specVersion", "limit" ]
-}
-
 
 #### Properties
 
@@ -419,12 +401,13 @@ As described in [Limit Application Order](#limit-application-order), angular con
 - Immediately after the inertia calculation
 - Immediately after each collision with a collider
 
-Accordingly, the value to which the angular constraint should be applied is `nextTail`, the world-space position of the child Node targeted by the Joint, which is used during the SpringBone inertia calculation and collision detection with colliders.
-Immediately after the inertia calculation and after collision detection with each collider, apply the limit so that the direction of `nextTail` remains within the specified angular range.
-This is the same point at which the distance of `nextTail` from the Joint position is constrained.
+The angular constraint is applied to `nextTail`.
+During a SpringBone update, `nextTail` represents the tentative world-space position of the child Node associated with the Joint.
+Immediately after the inertia calculation and after resolving each collider collision, apply the limit so that the direction from the Joint position to `nextTail` remains within the specified angular range.
+At the same points, the distance from the Joint position to `nextTail` is constrained to preserve the spring length.
 
-In the following reference implementations, `tailDir` is a normalized three-dimensional vector representing the world-space direction of the joint being constrained.
-It is defined using `nextTail`, as shown in the following pseudocode.
+In the following reference implementations, `tailDir` is a normalized world-space vector pointing from the constrained Joint to `nextTail`.
+It is defined as shown in the following pseudocode.
 
 ```ts
 var tailDir = (nextTail - joint.worldPosition).normalized;
@@ -478,7 +461,7 @@ let limitAngle = clamp(limit.angle, 0.0, PI);
 // Compare the y component of tailDir with the cosine of the angle specified by the limit
 let cosLimitAngle = cos(limitAngle);
 if (tailDir.y < cosLimitAngle) {
-  // Scale the x and z components by the ratio of the sine of tailDir to the sine of the angle specified by the limit
+  // Scale the x and z components so that their length equals the sine of the limit angle
   let horizontalLengthSquared = 1.0 - tailDir.y * tailDir.y;
 
   if (horizontalLengthSquared == 0.0) {
